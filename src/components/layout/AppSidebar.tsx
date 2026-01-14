@@ -8,7 +8,8 @@ import {
   Newspaper, 
   Activity, 
   Settings,
-  MessageSquare
+  MessageSquare,
+  UsersRound
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
@@ -29,6 +30,7 @@ const menuItems = [
   { title: 'Device Manager', url: '/devices', icon: Smartphone },
   { title: 'Chat Explorer', url: '/chats', icon: MessageCircle },
   { title: 'Send Center', url: '/send', icon: Send },
+  { title: 'Bulk Messaging', url: '/bulk', icon: UsersRound },
   { title: 'Group Management', url: '/groups', icon: Users },
   { title: 'User & Contact', url: '/user', icon: User },
   { title: 'Newsletter', url: '/newsletter', icon: Newspaper },
