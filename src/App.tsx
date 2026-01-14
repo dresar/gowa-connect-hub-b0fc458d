@@ -11,6 +11,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import DeviceManagerPage from "@/pages/DeviceManagerPage";
 import ChatExplorerPage from "@/pages/ChatExplorerPage";
 import SendCenterPage from "@/pages/SendCenterPage";
+import BulkMessagingPage from "@/pages/BulkMessagingPage";
 import GroupManagementPage from "@/pages/GroupManagementPage";
 import UserContactPage from "@/pages/UserContactPage";
 import NewsletterPage from "@/pages/NewsletterPage";
@@ -35,6 +36,7 @@ const App = () => (
                 <Route path="/devices" element={<DeviceManagerPage />} />
                 <Route path="/chats" element={<ChatExplorerPage />} />
                 <Route path="/send" element={<SendCenterPage />} />
+                <Route path="/bulk" element={<BulkMessagingPage />} />
                 <Route path="/groups" element={<GroupManagementPage />} />
                 <Route path="/user" element={<UserContactPage />} />
                 <Route path="/newsletter" element={<NewsletterPage />} />
