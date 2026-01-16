@@ -23,13 +23,14 @@ export interface GetChatsParams {
 }
 
 export const getGowaBaseUrl = () => {
+  const fallback = 'https://gowa.ekacode.web.id';
   if (typeof window === 'undefined') {
-    return (import.meta.env.API_URL || 'http://192.168.18.50:3003').replace(/\/+$/, '');
+    return (import.meta.env.API_URL || fallback).replace(/\/+$/, '');
   }
   const stored =
     localStorage.getItem('gowa_base_url') ||
     import.meta.env.API_URL ||
-    'http://192.168.18.50:3003';
+    fallback;
   return stored.replace(/\/+$/, '');
 };
 

@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-const API_URL = import.meta.env.API_URL || 'http://192.168.18.50:3003';
+const API_URL = import.meta.env.API_URL || 'https://gowa.ekacode.web.id';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');

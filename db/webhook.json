@@ -1,4 +1,12 @@
 {
   "enabled": true,
-  "logs": []
+  "logs": [
+    {
+      "id": "99c35491-06cc-4444-a790-5bf56dec9676",
+      "timestamp": "2026-01-16T05:22:46.786Z",
+      "event": "message",
+      "device_id": "test-device",
+      "preview": "hello from test"
+    }
+  ]
 }

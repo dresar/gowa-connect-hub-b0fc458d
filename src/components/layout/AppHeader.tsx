@@ -136,7 +136,7 @@ export function AppHeader() {
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">API URL</span>
               <span className="font-mono text-right break-all">
-                {import.meta.env.API_URL || 'http://192.168.18.50:3003'}
+                {import.meta.env.API_URL || 'https://gowa.ekacode.web.id'}
               </span>
             </div>
           </div>

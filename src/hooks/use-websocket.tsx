@@ -31,10 +31,11 @@ export function useWebSocket() {
     }
 
     try {
+      const fallback = 'http://localhost:3004';
       const url =
         typeof window !== 'undefined'
-          ? window.localStorage.getItem('gowa_bridge_url') || 'http://localhost:3001'
-          : 'http://localhost:3001';
+          ? window.localStorage.getItem('gowa_bridge_url') || fallback
+          : fallback;
 
       const socket = io(url, {
         transports: ['websocket'],

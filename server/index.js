@@ -32,9 +32,7 @@ const io = new Server(server, {
 setSocketIo(io);
 
 io.on('connection', socket => {
-  console.log('Client connected', socket.id);
   socket.on('disconnect', () => {
-    console.log('Client disconnected', socket.id);
   });
 });
 
@@ -56,4 +54,3 @@ const port = config.port;
 server.listen(port, () => {
   console.log(`Webhook bridge listening on http://localhost:${port}`);
 });
-

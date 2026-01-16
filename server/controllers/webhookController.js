@@ -47,7 +47,7 @@ export const getWebhookLogs = (req, res, next) => {
 
 export const handleWebhook = (req, res, next) => {
   try {
-    const payload = req.body;
+    const payload = req.body ?? {};
     console.log('Webhook received!');
     console.log(JSON.stringify(payload, null, 2));
 
@@ -105,4 +105,3 @@ export const handleWebhook = (req, res, next) => {
     next(error);
   }
 };
-

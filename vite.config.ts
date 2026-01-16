@@ -5,7 +5,7 @@ import { componentTagger } from "lovable-tagger";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const target = (env.API_URL || "http://192.168.18.50:3003").replace(/\/+$/, "");
+  const target = (env.API_URL || "https://gowa.ekacode.web.id").replace(/\/+$/, "");
 
   return {
     server: {

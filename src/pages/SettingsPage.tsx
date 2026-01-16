@@ -32,7 +32,7 @@ export default function SettingsPage() {
     setBaseUrl(
       localStorage.getItem('gowa_base_url') ||
         import.meta.env.API_URL ||
-        'http://192.168.18.50:3003'
+        'https://gowa.ekacode.web.id'
     );
   }, []);
 

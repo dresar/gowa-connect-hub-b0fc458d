@@ -18,8 +18,9 @@ interface WebhookLogEntry {
 }
 
 const getBridgeBaseUrl = () => {
-  if (typeof window === 'undefined') return 'http://localhost:3001';
-  const stored = window.localStorage.getItem('gowa_bridge_url') || 'http://localhost:3001';
+  const fallback = 'http://localhost:3004';
+  if (typeof window === 'undefined') return fallback;
+  const stored = window.localStorage.getItem('gowa_bridge_url') || fallback;
   return stored.replace(/\/+$/, '');
 };
 
