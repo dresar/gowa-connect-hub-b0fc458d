@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { useLogs } from '@/contexts/LogContext';
-import { getGowaBaseUrl } from '@/lib/api';
 
 export interface WebhookEvent {
   id: string;
@@ -19,94 +19,97 @@ const generateId = () =>
 export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false);
   const [events, setEvents] = useState<WebhookEvent[]>([]);
-  const wsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const { addLog } = useLogs();
 
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null;
 
-  const connect = useCallback((webhookUrl?: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+  const connect = useCallback(() => {
+    if (socketRef.current) {
       return;
     }
 
-    const baseUrl = webhookUrl || getGowaBaseUrl();
-
-    const wsUrl =
-      webhookUrl ||
-      baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-
     try {
-      wsRef.current = new WebSocket(wsUrl);
+      const url =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem('gowa_bridge_url') || 'http://localhost:3001'
+          : 'http://localhost:3001';
 
-      wsRef.current.onopen = () => {
+      const socket = io(url, {
+        transports: ['websocket'],
+      });
+
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
         setIsConnected(true);
         addLog({
           type: 'response',
           method: 'WS',
-          url: wsUrl,
-          data: { message: 'WebSocket connected' },
-          status: 200
+          url,
+          data: { message: 'Socket.io connected' },
+          status: 200,
         });
-      };
+      });
 
-      wsRef.current.onmessage = (event) => {
+      socket.on('disconnect', () => {
+        setIsConnected(false);
+      });
+
+      socket.on('gowa-event', (data: unknown) => {
         try {
-          const data: unknown = JSON.parse(event.data);
+          const record = isRecord(data) ? data : {};
           const type =
-            isRecord(data) && typeof data.type === 'string'
-              ? data.type
-              : isRecord(data) && typeof data.event === 'string'
-              ? (data.event as string)
-              : isRecord(data) && typeof data.code === 'string'
-              ? (data.code as string)
+            isRecord(record) && typeof record.type === 'string'
+              ? record.type
+              : isRecord(record) && typeof record.event === 'string'
+              ? (record.event as string)
               : 'unknown';
           const newEvent: WebhookEvent = {
             id: generateId(),
             type,
             timestamp: new Date(),
-            data
+            data,
           };
           setEvents(prev => [newEvent, ...prev].slice(0, 100));
-          
-          if (type.toLowerCase() === 'message' && 'Notification' in window && Notification.permission === 'granted') {
+
+          if (
+            type.toLowerCase() === 'message' &&
+            'Notification' in window &&
+            Notification.permission === 'granted'
+          ) {
             let body = 'New message received';
-            if (isRecord(data)) {
-              if (isRecord(data.message) && typeof data.message.text === 'string') {
-                body = data.message.text;
-              } else if (isRecord(data.payload) && typeof data.payload.body === 'string') {
-                body = data.payload.body;
+            if (isRecord(record)) {
+              if (isRecord((record as { message?: unknown }).message) &&
+                typeof (record as { message: { text?: string } }).message.text === 'string') {
+                body = (record as { message: { text: string } }).message.text;
+              } else if (
+                isRecord((record as { payload?: unknown }).payload) &&
+                typeof (record as { payload: { body?: string } }).payload.body === 'string'
+              ) {
+                body = (record as { payload: { body: string } }).payload.body;
               }
             }
             new Notification('New WhatsApp Message', {
               body,
-              icon: '/favicon.ico'
+              icon: '/favicon.ico',
             });
           }
         } catch (e) {
-          console.error('Failed to parse WebSocket message:', e);
+          console.error('Failed to handle socket event:', e);
         }
-      };
-
-      wsRef.current.onclose = () => {
-        setIsConnected(false);
-      };
-
-      wsRef.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setIsConnected(false);
-      };
+      });
     } catch (error) {
-      console.error('Failed to connect WebSocket:', error);
+      console.error('Failed to connect Socket.io:', error);
     }
   }, [addLog]);
 
   const disconnect = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-      setIsConnected(false);
-    }
+    if (!socketRef.current) return;
+    socketRef.current.disconnect();
+    socketRef.current = null;
+    setIsConnected(false);
   }, []);
 
   const clearEvents = useCallback(() => {

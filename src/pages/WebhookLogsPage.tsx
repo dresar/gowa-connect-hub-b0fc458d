@@ -1,19 +1,38 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, Trash2, Copy, CheckCircle, XCircle, AlertCircle, PlugZap, Plug } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { useLogs } from '@/contexts/LogContext';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/hooks/use-websocket';
-import { useAuth } from '@/contexts/AuthContext';
-import { getGowaBaseUrl } from '@/lib/api';
+
+interface WebhookLogEntry {
+  id: string;
+  timestamp: string;
+  event?: string;
+  device_id?: string;
+  preview?: string;
+}
+
+const getBridgeBaseUrl = () => {
+  if (typeof window === 'undefined') return 'http://localhost:3001';
+  const stored = window.localStorage.getItem('gowa_bridge_url') || 'http://localhost:3001';
+  return stored.replace(/\/+$/, '');
+};
 
 export default function WebhookLogsPage() {
   const { logs, clearLogs } = useLogs();
   const { toast } = useToast();
   const { isConnected, events, connect, disconnect, clearEvents } = useWebSocket();
-  const { selectedDevice } = useAuth();
+  const [webhookEnabled, setWebhookEnabled] = useState<boolean | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(false);
+  const [webhookLogs, setWebhookLogs] = useState<WebhookLogEntry[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const bridgeBaseUrl = useMemo(() => getBridgeBaseUrl(), []);
 
   const copyLog = (log: typeof logs[0]) => {
     navigator.clipboard.writeText(JSON.stringify(log.data, null, 2));
@@ -37,25 +56,8 @@ export default function WebhookLogsPage() {
     return <Badge variant={variant}>{status}</Badge>;
   };
 
-  const buildWsUrl = () => {
-    const base = getGowaBaseUrl();
-    const path = selectedDevice
-      ? `/ws?device_id=${encodeURIComponent(selectedDevice)}`
-      : '/ws';
-    return base.replace('https://', 'wss://').replace('http://', 'ws://') + path;
-  };
-
   const handleConnect = () => {
-    if (!selectedDevice) {
-      toast({
-        title: 'Device belum dipilih',
-        description: 'Pilih device di halaman Device Manager terlebih dahulu.',
-        variant: 'destructive',
-      });
-      return;
-    }
-    const wsUrl = buildWsUrl();
-    connect(wsUrl);
+    connect();
   };
 
   const handleDisconnect = () => {
@@ -64,6 +66,65 @@ export default function WebhookLogsPage() {
 
   const handleClearEvents = () => {
     clearEvents();
+  };
+
+  const fetchSettings = useCallback(async () => {
+    setLoadingSettings(true);
+    try {
+      const response = await fetch(`${bridgeBaseUrl}/webhook/settings`);
+      const data = await response.json();
+      if (typeof data.enabled === 'boolean') {
+        setWebhookEnabled(data.enabled);
+      } else {
+        setWebhookEnabled(true);
+      }
+    } catch {
+      setWebhookEnabled(true);
+    }
+    setLoadingSettings(false);
+  }, [bridgeBaseUrl]);
+
+  const fetchLogs = useCallback(async () => {
+    setLoadingLogs(true);
+    try {
+      const response = await fetch(`${bridgeBaseUrl}/webhook/logs`);
+      const data = await response.json();
+      const raw = Array.isArray(data.logs) ? data.logs : data;
+      if (Array.isArray(raw)) {
+        setWebhookLogs(raw as WebhookLogEntry[]);
+      } else {
+        setWebhookLogs([]);
+      }
+    } catch {
+      setWebhookLogs([]);
+    }
+    setLoadingLogs(false);
+  }, [bridgeBaseUrl]);
+
+  useEffect(() => {
+    fetchSettings();
+    fetchLogs();
+  }, [fetchSettings, fetchLogs]);
+
+  const handleToggleWebhook = async (value: boolean) => {
+    setWebhookEnabled(value);
+    setLoadingSettings(true);
+    try {
+      const response = await fetch(`${bridgeBaseUrl}/webhook/settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled: value }),
+      });
+      const data = await response.json();
+      if (typeof data.enabled === 'boolean') {
+        setWebhookEnabled(data.enabled);
+      }
+    } catch {
+      setWebhookEnabled(prev => !prev);
+    }
+    setLoadingSettings(false);
   };
 
   return (
@@ -83,10 +144,46 @@ export default function WebhookLogsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="w-5 h-5" />
+            Webhook Settings
+          </CardTitle>
+          <CardDescription>
+            Pengaturan webhook bridge dan status penyimpanan ke file JSON.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Webhook Status</span>
+                {webhookEnabled !== null && (
+                  <Badge variant={webhookEnabled ? 'default' : 'outline'}>
+                    {webhookEnabled ? 'On' : 'Off'}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Bridge URL: <span className="font-mono">{bridgeBaseUrl}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={webhookEnabled ?? true}
+                disabled={loadingSettings}
+                onCheckedChange={handleToggleWebhook}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="w-5 h-5" />
             Webhook Events (WebSocket)
           </CardTitle>
           <CardDescription>
-            Terhubung ke WebSocket backend untuk menangkap event real-time.
+            Terhubung ke Socket.io bridge untuk menangkap event real-time.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -95,11 +192,6 @@ export default function WebhookLogsPage() {
               <Badge variant={isConnected ? 'default' : 'outline'}>
                 {isConnected ? 'Connected' : 'Disconnected'}
               </Badge>
-              {selectedDevice && (
-                <span className="text-xs text-muted-foreground">
-                  Device: <span className="font-mono">{selectedDevice}</span>
-                </span>
-              )}
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -153,6 +245,59 @@ export default function WebhookLogsPage() {
                     <pre className="mt-1 p-2 rounded bg-secondary text-secondary-foreground overflow-x-auto font-mono text-[10px]">
                       {JSON.stringify(event.data, null, 2)}
                     </pre>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            Webhook Logs (JSON)
+          </CardTitle>
+          <CardDescription>
+            Riwayat webhook yang disimpan di file db/webhook.json pada backend.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingLogs ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              Loading webhook logs...
+            </div>
+          ) : webhookLogs.length === 0 ? (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              Belum ada webhook yang tercatat.
+            </div>
+          ) : (
+            <ScrollArea className="h-[260px]">
+              <div className="space-y-3">
+                {webhookLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="p-3 rounded-lg border border-border bg-muted/40 text-xs"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{log.event || 'event'}</Badge>
+                        {log.device_id && (
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {log.device_id}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    {log.preview && (
+                      <p className="mt-1 text-[11px] text-foreground line-clamp-2">
+                        {log.preview}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

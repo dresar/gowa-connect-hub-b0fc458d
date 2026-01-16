@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "::",
       port: 8080,
+      allowedHosts: ["depan.ekacode.web.id"],
       hmr: {
         overlay: false,
       },

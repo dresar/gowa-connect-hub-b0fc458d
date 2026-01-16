@@ -94,12 +94,6 @@ export default function GroupManagementPage() {
   const [groupAnnounce, setGroupAnnounceState] = useState(false);
   const [newParticipantPhone, setNewParticipantPhone] = useState('');
 
-  const hasBasicAuth = () => {
-    const username = localStorage.getItem('gowa_username') || import.meta.env.API_USER || '';
-    const password = localStorage.getItem('gowa_password') || import.meta.env.API_PASS || '';
-    return Boolean(username && password);
-  };
-
   const getErrorPayload = (error: unknown) => {
     if (typeof error === 'object' && error !== null && 'response' in error) {
       const response = (error as { response?: { status?: number; data?: unknown } }).response;
@@ -117,18 +111,6 @@ export default function GroupManagementPage() {
   };
 
   const fetchGroups = useCallback(async () => {
-    if (!hasBasicAuth()) {
-      console.error('[Groups] Missing Basic Auth credentials');
-      setGroups([]);
-      setLoading(false);
-      toast({
-        title: 'Basic Auth belum diatur',
-        description: 'Buka Settings lalu isi API User & Password.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setLoading(true);
     try {
       console.log('[Groups] Request /user/my/groups', { limit: 1000, offset: 0 });
