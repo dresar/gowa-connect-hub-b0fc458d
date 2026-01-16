@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react';
-import { RefreshCw, LogOut, Server, Smartphone, MessageSquare, Battery } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { RefreshCw, LogOut, Server, Smartphone, MessageSquare } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { getAppStatus, getDeviceStatus, getDeviceInfo, reconnectDevice, logoutDevice } from '@/lib/api';
+import { getAppStatus, getChats, getDeviceStatus, getDeviceInfo, reconnectDevice, logoutDevice } from '@/lib/api';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { PageLoader } from '@/components/common/LoadingSpinner';
 import { useToast } from '@/hooks/use-toast';
+import { ChartContainer, type ChartConfig, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 
 interface ServerStatus {
   status: string;
@@ -21,37 +23,149 @@ interface DeviceStatusData {
   battery?: number;
 }
 
+interface ChatSummary {
+  totalChats: number;
+  totalUnread: number;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const unwrapData = (payload: unknown): unknown => {
+  let current: unknown = payload;
+  while (isRecord(current) && isRecord(current.data)) {
+    current = current.data;
+  }
+  return current;
+};
+
+const getString = (obj: unknown, key: string) =>
+  isRecord(obj) && typeof obj[key] === 'string' ? (obj[key] as string) : undefined;
+
+const getNumber = (obj: unknown, key: string) =>
+  isRecord(obj) && typeof obj[key] === 'number' ? (obj[key] as number) : undefined;
+
+const coerceNumber = (value: unknown): number | undefined =>
+  typeof value === 'number' ? value : undefined;
+
+const normalizeArray = (payload: unknown): unknown[] => {
+  const data = unwrapData(payload);
+  if (Array.isArray(data)) return data;
+  if (isRecord(data)) {
+    const candidates = [data.chats, data.messages, data.results, data.data];
+    for (const c of candidates) {
+      if (Array.isArray(c)) return c;
+    }
+  }
+  return [];
+};
+
 export default function DashboardPage() {
-  const { selectedDevice } = useAuth();
+  const { selectedDevice, devices } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatusData | null>(null);
+  const [chatSummary, setChatSummary] = useState<ChatSummary>({ totalChats: 0, totalUnread: 0 });
   const [actionLoading, setActionLoading] = useState('');
 
-  const fetchStatus = async () => {
+  const fetchStatus = useCallback(async () => {
     setLoading(true);
+
     try {
       const serverRes = await getAppStatus();
-      setServerStatus(serverRes.data);
+      const serverData = unwrapData(serverRes.data);
+      const serverStatusValue =
+        getString(serverData, 'status') ||
+        getString(serverData, 'connection') ||
+        'online';
 
-      if (selectedDevice) {
+      setServerStatus({
+        status: serverStatusValue,
+        version: getString(serverData, 'version'),
+        uptime: getString(serverData, 'uptime'),
+      });
+    } catch (error) {
+      console.error('Failed to fetch server status:', error);
+      toast({
+        title: 'Gagal memuat server status',
+        description: 'Tidak bisa terhubung ke API. Cek server atau menu Settings.',
+        variant: 'destructive',
+      });
+      setServerStatus(null);
+      setDeviceStatus(null);
+      setChatSummary({ totalChats: 0, totalUnread: 0 });
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const chatsRes = await getChats({ limit: 50, offset: 0 });
+      const list = normalizeArray(chatsRes.data);
+      const totalUnread = list.reduce<number>((acc, chat) => {
+        if (!isRecord(chat)) return acc;
+        const unread =
+          coerceNumber(chat.unreadCount) ??
+          coerceNumber(chat.unread_count) ??
+          coerceNumber(chat.unread) ??
+          0;
+        return acc + unread;
+      }, 0);
+      setChatSummary({ totalChats: list.length, totalUnread });
+    } catch (error) {
+      console.error('Failed to fetch chat summary:', error);
+      setChatSummary({ totalChats: 0, totalUnread: 0 });
+    }
+
+    if (selectedDevice) {
+      const currentMeta = devices.find((d) => d.id === selectedDevice);
+      try {
         const deviceRes = await getDeviceStatus(selectedDevice);
         const infoRes = await getDeviceInfo(selectedDevice);
+        const statusData = unwrapData(deviceRes.data);
+        const infoData = unwrapData(infoRes.data);
+        const deviceStatusValue =
+          getString(statusData, 'status') ||
+          getString(infoData, 'status') ||
+          'online';
+
         setDeviceStatus({
-          ...deviceRes.data,
-          ...infoRes.data
+          status: deviceStatusValue,
+          phone:
+            getString(infoData, 'phone') ||
+            getString(statusData, 'phone') ||
+            getString(infoData, 'jid') ||
+            getString(statusData, 'jid'),
+          pushName:
+            getString(infoData, 'pushName') ||
+            getString(infoData, 'name') ||
+            getString(statusData, 'pushName') ||
+            getString(statusData, 'name') ||
+            currentMeta?.name ||
+            selectedDevice,
+          battery:
+            getNumber(statusData, 'battery') ??
+            getNumber(infoData, 'battery'),
+        });
+      } catch (error) {
+        console.error('Failed to fetch device status:', error);
+        setDeviceStatus({
+          status: 'offline',
+          phone: undefined,
+          pushName: undefined,
+          battery: undefined,
         });
       }
-    } catch (error) {
-      console.error('Failed to fetch status:', error);
+    } else {
+      setDeviceStatus(null);
     }
+
     setLoading(false);
-  };
+  }, [selectedDevice, devices, toast]);
 
   useEffect(() => {
     fetchStatus();
-  }, [selectedDevice]);
+  }, [fetchStatus]);
 
   const handleReconnect = async () => {
     if (!selectedDevice) return;
@@ -82,17 +196,36 @@ export default function DashboardPage() {
   if (loading) return <PageLoader />;
 
   const stats = [
-    { 
-      title: 'Messages Today', 
-      value: '156', 
-      icon: MessageSquare, 
-      color: 'text-primary' 
+    {
+      title: 'Total Chats',
+      value: String(chatSummary.totalChats),
+      icon: MessageSquare,
+      color: 'text-primary',
     },
-    { 
-      title: 'Battery Level', 
-      value: deviceStatus?.battery ? `${deviceStatus.battery}%` : 'N/A', 
-      icon: Battery, 
-      color: 'text-green-500' 
+    {
+      title: 'Unread Messages',
+      value: String(chatSummary.totalUnread),
+      icon: MessageSquare,
+      color: 'text-primary',
+    },
+  ];
+
+  const chatChartConfig = {
+    total: {
+      label: 'Total Chats',
+      color: 'hsl(var(--primary))',
+    },
+    unread: {
+      label: 'Unread Messages',
+      color: 'hsl(var(--destructive))',
+    },
+  } satisfies ChartConfig;
+
+  const chatChartData = [
+    {
+      label: 'Chats',
+      total: chatSummary.totalChats,
+      unread: chatSummary.totalUnread,
     },
   ];
 
@@ -116,7 +249,11 @@ export default function DashboardPage() {
             <Server className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <StatusBadge status={serverStatus?.status || 'unknown'} />
+            {serverStatus?.status ? (
+              <StatusBadge status={serverStatus.status} />
+            ) : (
+              <p className="text-sm text-muted-foreground">N/A</p>
+            )}
             {serverStatus?.version && (
               <p className="text-xs text-muted-foreground mt-2">v{serverStatus.version}</p>
             )}
@@ -131,7 +268,11 @@ export default function DashboardPage() {
           <CardContent>
             {selectedDevice ? (
               <>
-                <StatusBadge status={deviceStatus?.status || 'unknown'} />
+                {deviceStatus?.status ? (
+                  <StatusBadge status={deviceStatus.status} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">N/A</p>
+                )}
                 {deviceStatus?.pushName && (
                   <p className="text-xs text-muted-foreground mt-2">{deviceStatus.pushName}</p>
                 )}
@@ -155,15 +296,36 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+        <Card className="col-span-1">
+          <CardHeader>
+            <CardTitle>Chat Overview</CardTitle>
+            <CardDescription>Comparison between total chats and unread messages</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chatChartConfig} className="h-60">
+              <ResponsiveContainer>
+                <BarChart data={chatChartData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                  <YAxis allowDecimals={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="total" fill="var(--color-total)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="unread" fill="var(--color-unread)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription>Common device operations</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Button 
-              onClick={handleReconnect} 
+            <Button
+              onClick={handleReconnect}
               disabled={!selectedDevice || actionLoading === 'reconnect'}
             >
               {actionLoading === 'reconnect' ? (
@@ -173,8 +335,8 @@ export default function DashboardPage() {
               )}
               Reconnect Device
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleLogout}
               disabled={!selectedDevice || actionLoading === 'logout'}
             >
@@ -187,7 +349,9 @@ export default function DashboardPage() {
             </Button>
           </CardContent>
         </Card>
+      </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Device Info</CardTitle>
@@ -202,11 +366,19 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Phone</span>
-                  <span className="font-medium">{deviceStatus?.phone || 'N/A'}</span>
+                  <span className="font-medium">
+                    {deviceStatus?.phone && deviceStatus.phone.trim() !== ''
+                      ? deviceStatus.phone
+                      : '-'}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Name</span>
-                  <span className="font-medium">{deviceStatus?.pushName || 'N/A'}</span>
+                  <span className="font-medium">
+                    {deviceStatus?.pushName && deviceStatus.pushName.trim() !== ''
+                      ? deviceStatus.pushName
+                      : '-'}
+                  </span>
                 </div>
               </div>
             ) : (

@@ -1,0 +1,153 @@
+{
+  "auto_reply_rules": [
+    {
+      "id": "rule-1",
+      "pesan": "halo",
+      "balasan": "Halo, ada yang bisa kami bantu?",
+      "created_at": "2025-01-16T00:00:00.000Z",
+      "updated_at": "2025-01-16T00:00:00.000Z"
+    },
+    {
+      "id": "rule-2",
+      "pesan": "hi",
+      "balasan": "Hi, selamat datang di layanan kami.",
+      "created_at": "2025-01-16T00:01:00.000Z",
+      "updated_at": "2025-01-16T00:01:00.000Z"
+    },
+    {
+      "id": "rule-3",
+      "pesan": "assalamualaikum",
+      "balasan": "Waalaikumsalam, terima kasih sudah menghubungi kami.",
+      "created_at": "2025-01-16T00:02:00.000Z",
+      "updated_at": "2025-01-16T00:02:00.000Z"
+    },
+    {
+      "id": "rule-4",
+      "pesan": "pagi",
+      "balasan": "Selamat pagi, semoga harimu menyenangkan.",
+      "created_at": "2025-01-16T00:03:00.000Z",
+      "updated_at": "2025-01-16T00:03:00.000Z"
+    },
+    {
+      "id": "rule-5",
+      "pesan": "siang",
+      "balasan": "Selamat siang, ada yang bisa kami bantu?",
+      "created_at": "2025-01-16T00:04:00.000Z",
+      "updated_at": "2025-01-16T00:04:00.000Z"
+    },
+    {
+      "id": "rule-6",
+      "pesan": "sore",
+      "balasan": "Selamat sore, terima kasih sudah menghubungi layanan kami.",
+      "created_at": "2025-01-16T00:05:00.000Z",
+      "updated_at": "2025-01-16T00:05:00.000Z"
+    },
+    {
+      "id": "rule-7",
+      "pesan": "malam",
+      "balasan": "Selamat malam, kami siap membantu kebutuhan Anda.",
+      "created_at": "2025-01-16T00:06:00.000Z",
+      "updated_at": "2025-01-16T00:06:00.000Z"
+    },
+    {
+      "id": "rule-8",
+      "pesan": "menu",
+      "balasan": "Menu:\n1. Info produk\n2. Cek harga\n3. Hubungi admin",
+      "created_at": "2025-01-16T00:07:00.000Z",
+      "updated_at": "2025-01-16T00:07:00.000Z"
+    },
+    {
+      "id": "rule-9",
+      "pesan": "produk",
+      "balasan": "Untuk daftar produk lengkap, silakan ketik: daftar produk.",
+      "created_at": "2025-01-16T00:08:00.000Z",
+      "updated_at": "2025-01-16T00:08:00.000Z"
+    },
+    {
+      "id": "rule-10",
+      "pesan": "daftar produk",
+      "balasan": "Contoh produk:\n- Paket A\n- Paket B\n- Paket C",
+      "created_at": "2025-01-16T00:09:00.000Z",
+      "updated_at": "2025-01-16T00:09:00.000Z"
+    },
+    {
+      "id": "rule-11",
+      "pesan": "harga",
+      "balasan": "Untuk info harga, sebutkan nama produk yang ingin dicek.",
+      "created_at": "2025-01-16T00:10:00.000Z",
+      "updated_at": "2025-01-16T00:10:00.000Z"
+    },
+    {
+      "id": "rule-12",
+      "pesan": "diskon",
+      "balasan": "Saat ini kami memiliki promo khusus. Tanyakan ke admin untuk detail lengkap.",
+      "created_at": "2025-01-16T00:11:00.000Z",
+      "updated_at": "2025-01-16T00:11:00.000Z"
+    },
+    {
+      "id": "rule-13",
+      "pesan": "alamat",
+      "balasan": "Alamat kami: Jl. Contoh No. 123, Jakarta.",
+      "created_at": "2025-01-16T00:12:00.000Z",
+      "updated_at": "2025-01-16T00:12:00.000Z"
+    },
+    {
+      "id": "rule-14",
+      "pesan": "jam buka",
+      "balasan": "Jam operasional: Senin–Jumat 09.00–17.00 WIB.",
+      "created_at": "2025-01-16T00:13:00.000Z",
+      "updated_at": "2025-01-16T00:13:00.000Z"
+    },
+    {
+      "id": "rule-15",
+      "pesan": "admin",
+      "balasan": "Untuk ngobrol dengan admin, kirim data Anda dan tulis: butuh admin.",
+      "created_at": "2025-01-16T00:14:00.000Z",
+      "updated_at": "2025-01-16T00:14:00.000Z"
+    },
+    {
+      "id": "rule-16",
+      "pesan": "butuh admin",
+      "balasan": "Baik, pesan Anda akan segera diteruskan ke admin.",
+      "created_at": "2025-01-16T00:15:00.000Z",
+      "updated_at": "2025-01-16T00:15:00.000Z"
+    },
+    {
+      "id": "rule-17",
+      "pesan": "cs",
+      "balasan": "Customer service kami online di jam kerja. Mohon tunggu respon berikutnya.",
+      "created_at": "2025-01-16T00:16:00.000Z",
+      "updated_at": "2025-01-16T00:16:00.000Z"
+    },
+    {
+      "id": "rule-18",
+      "pesan": "thanks",
+      "balasan": "Terima kasih kembali. Senang bisa membantu Anda.",
+      "created_at": "2025-01-16T00:17:00.000Z",
+      "updated_at": "2025-01-16T00:17:00.000Z"
+    },
+    {
+      "id": "rule-19",
+      "pesan": "terima kasih",
+      "balasan": "Sama-sama, semoga hari Anda menyenangkan.",
+      "created_at": "2025-01-16T00:18:00.000Z",
+      "updated_at": "2025-01-16T00:18:00.000Z"
+    },
+    {
+      "id": "rule-20",
+      "pesan": "test auto reply",
+      "balasan": "Auto reply aktif dan berhasil membalas pesan Anda.",
+      "created_at": "2025-01-16T00:19:00.000Z",
+      "updated_at": "2025-01-16T00:19:00.000Z"
+    }
+  ],
+  "auto_reply_settings": {
+    "autoConnect": true,
+    "enabled": true
+  },
+  "meta": {
+    "version": 1,
+    "created_at": "2025-01-16T00:19:00.000Z",
+    "updated_at": "2025-01-16T00:19:00.000Z"
+  }
+}

@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useLogs } from '@/contexts/LogContext';
+import { getGowaBaseUrl } from '@/lib/api';
 
 export interface WebhookEvent {
   id: string;
   type: string;
   timestamp: Date;
-  data: any;
+  data: unknown;
 }
+
+const generateId = () =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 
 export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false);
@@ -14,14 +22,19 @@ export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const { addLog } = useLogs();
 
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
   const connect = useCallback((webhookUrl?: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       return;
     }
 
-    // Default to a simulated connection for demo
-    const baseUrl = localStorage.getItem('gowa_base_url') || 'https://gowa.ekacode.web.id';
-    const wsUrl = webhookUrl || baseUrl.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws';
+    const baseUrl = webhookUrl || getGowaBaseUrl();
+
+    const wsUrl =
+      webhookUrl ||
+      baseUrl.replace('https://', 'wss://').replace('http://', 'ws://');
 
     try {
       wsRef.current = new WebSocket(wsUrl);
@@ -39,19 +52,34 @@ export function useWebSocket() {
 
       wsRef.current.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const data: unknown = JSON.parse(event.data);
+          const type =
+            isRecord(data) && typeof data.type === 'string'
+              ? data.type
+              : isRecord(data) && typeof data.event === 'string'
+              ? (data.event as string)
+              : isRecord(data) && typeof data.code === 'string'
+              ? (data.code as string)
+              : 'unknown';
           const newEvent: WebhookEvent = {
-            id: crypto.randomUUID(),
-            type: data.type || 'unknown',
+            id: generateId(),
+            type,
             timestamp: new Date(),
             data
           };
           setEvents(prev => [newEvent, ...prev].slice(0, 100));
           
-          // Show notification for incoming messages
-          if (data.type === 'message' && 'Notification' in window && Notification.permission === 'granted') {
+          if (type.toLowerCase() === 'message' && 'Notification' in window && Notification.permission === 'granted') {
+            let body = 'New message received';
+            if (isRecord(data)) {
+              if (isRecord(data.message) && typeof data.message.text === 'string') {
+                body = data.message.text;
+              } else if (isRecord(data.payload) && typeof data.payload.body === 'string') {
+                body = data.payload.body;
+              }
+            }
             new Notification('New WhatsApp Message', {
-              body: data.message?.text || 'New message received',
+              body,
               icon: '/favicon.ico'
             });
           }
@@ -85,11 +113,17 @@ export function useWebSocket() {
     setEvents([]);
   }, []);
 
-  // Simulate events for demo purposes when real WebSocket is not available
-  const simulateEvent = useCallback((eventData: any) => {
+  const simulateEvent = useCallback((eventData: unknown) => {
+    const type =
+      typeof eventData === 'object' &&
+      eventData !== null &&
+      'type' in eventData &&
+      typeof (eventData as Record<string, unknown>).type === 'string'
+        ? (eventData as Record<string, unknown>).type as string
+        : 'message';
     const newEvent: WebhookEvent = {
-      id: crypto.randomUUID(),
-      type: eventData.type || 'message',
+      id: generateId(),
+      type,
       timestamp: new Date(),
       data: eventData
     };

@@ -5,10 +5,17 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
+  const normalized = status.toLowerCase();
+
+  const label =
+    normalized === 'available' ? 'Active' : status.charAt(0).toUpperCase() + status.slice(1);
+
   const getVariant = () => {
-    switch (status.toLowerCase()) {
+    const value = normalized === 'available' ? 'connected' : normalized;
+    switch (value) {
       case 'connected':
       case 'online':
+      case 'active':
         return 'default';
       case 'connecting':
       case 'pending':
@@ -24,9 +31,11 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   };
 
   const getColor = () => {
-    switch (status.toLowerCase()) {
+    const value = normalized === 'available' ? 'connected' : normalized;
+    switch (value) {
       case 'connected':
       case 'online':
+      case 'active':
         return 'bg-green-500';
       case 'connecting':
       case 'pending':
@@ -44,7 +53,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   return (
     <Badge variant={getVariant()} className="gap-2">
       <span className={`w-2 h-2 rounded-full ${getColor()}`} />
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {label}
     </Badge>
   );
 }

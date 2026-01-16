@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, Image, Video, FileText, MapPin, User, Sticker, BarChart2, Loader2 } from 'lucide-react';
+import { Send, Image, Video, FileText, MapPin, User, Sticker, BarChart2, Loader2, Link2, Activity } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,11 +12,14 @@ import {
   sendImage, 
   sendVideo, 
   sendAudio, 
-  sendDocument, 
+  sendFile, 
   sendPoll, 
   sendLocation, 
   sendContact,
-  sendSticker
+  sendSticker,
+  sendLink,
+  sendPresence,
+  sendChatPresence
 } from '@/lib/api';
 import { useLogs } from '@/contexts/LogContext';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +39,7 @@ export default function SendCenterPage() {
   const [mediaUrl, setMediaUrl] = useState('');
   const [mediaCaption, setMediaCaption] = useState('');
   const [mediaViewOnce, setMediaViewOnce] = useState(false);
-  const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | 'document'>('image');
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'audio' | 'file'>('image');
 
   // Poll form
   const [pollPhone, setPollPhone] = useState('');
@@ -58,16 +61,35 @@ export default function SendCenterPage() {
   const [stickerPhone, setStickerPhone] = useState('');
   const [stickerFile, setStickerFile] = useState<File | null>(null);
 
+  // Link form
+  const [linkPhone, setLinkPhone] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkCaption, setLinkCaption] = useState('');
+
+  // Presence form
+  const [presencePhone, setPresencePhone] = useState('');
+  const [presenceType, setPresenceType] = useState<'presence' | 'chat'>('presence');
+  const [presenceValue, setPresenceValue] = useState('available');
+
+  const getErrorData = (error: unknown) => {
+    if (typeof error === 'object' && error !== null && 'response' in error) {
+      const response = (error as { response?: { data?: unknown } }).response;
+      if (response && 'data' in response) return response.data;
+    }
+    if (error instanceof Error) return error.message;
+    return error;
+  };
+
   const handleSendText = async () => {
     setLoading(true);
     try {
       const response = await sendText(textPhone, textMessage);
-      addLog({ type: 'response', method: 'POST', url: '/send/text', data: response.data, status: 200 });
+      addLog({ type: 'response', method: 'POST', url: '/send/message', data: response.data, status: 200 });
       toast({ title: 'Message sent!', description: `To: ${textPhone}` });
       setTextPhone('');
       setTextMessage('');
-    } catch (error: any) {
-      addLog({ type: 'error', method: 'POST', url: '/send/text', data: error.response?.data });
+    } catch (error: unknown) {
+      addLog({ type: 'error', method: 'POST', url: '/send/message', data: getErrorData(error) });
       toast({ title: 'Failed to send', variant: 'destructive' });
     }
     setLoading(false);
@@ -86,7 +108,7 @@ export default function SendCenterPage() {
     if (mediaViewOnce) formData.append('viewOnce', 'true');
 
     try {
-      const sendFn = { image: sendImage, video: sendVideo, audio: sendAudio, document: sendDocument }[mediaType];
+      const sendFn = { image: sendImage, video: sendVideo, audio: sendAudio, file: sendFile }[mediaType];
       const response = await sendFn(formData);
       addLog({ type: 'response', method: 'POST', url: `/send/${mediaType}`, data: response.data, status: 200 });
       toast({ title: 'Media sent!' });
@@ -94,8 +116,8 @@ export default function SendCenterPage() {
       setMediaFile(null);
       setMediaUrl('');
       setMediaCaption('');
-    } catch (error: any) {
-      addLog({ type: 'error', method: 'POST', url: `/send/${mediaType}`, data: error.response?.data });
+    } catch (error: unknown) {
+      addLog({ type: 'error', method: 'POST', url: `/send/${mediaType}`, data: getErrorData(error) });
       toast({ title: 'Failed to send', variant: 'destructive' });
     }
     setLoading(false);
@@ -111,8 +133,8 @@ export default function SendCenterPage() {
       setPollPhone('');
       setPollQuestion('');
       setPollOptions(['', '']);
-    } catch (error: any) {
-      addLog({ type: 'error', method: 'POST', url: '/send/poll', data: error.response?.data });
+    } catch (error: unknown) {
+      addLog({ type: 'error', method: 'POST', url: '/send/poll', data: getErrorData(error) });
       toast({ title: 'Failed to send', variant: 'destructive' });
     }
     setLoading(false);
@@ -127,8 +149,8 @@ export default function SendCenterPage() {
       setLocPhone('');
       setLocLat('');
       setLocLong('');
-    } catch (error: any) {
-      addLog({ type: 'error', method: 'POST', url: '/send/location', data: error.response?.data });
+    } catch (error: unknown) {
+      addLog({ type: 'error', method: 'POST', url: '/send/location', data: getErrorData(error) });
       toast({ title: 'Failed to send', variant: 'destructive' });
     }
     setLoading(false);
@@ -143,8 +165,8 @@ export default function SendCenterPage() {
       setContactPhone('');
       setContactName('');
       setContactNumber('');
-    } catch (error: any) {
-      addLog({ type: 'error', method: 'POST', url: '/send/contact', data: error.response?.data });
+    } catch (error: unknown) {
+      addLog({ type: 'error', method: 'POST', url: '/send/contact', data: getErrorData(error) });
       toast({ title: 'Failed to send', variant: 'destructive' });
     }
     setLoading(false);
@@ -163,8 +185,40 @@ export default function SendCenterPage() {
       toast({ title: 'Sticker sent!' });
       setStickerPhone('');
       setStickerFile(null);
-    } catch (error: any) {
-      addLog({ type: 'error', method: 'POST', url: '/send/sticker', data: error.response?.data });
+    } catch (error: unknown) {
+      addLog({ type: 'error', method: 'POST', url: '/send/sticker', data: getErrorData(error) });
+      toast({ title: 'Failed to send', variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleSendLink = async () => {
+    setLoading(true);
+    try {
+      const response = await sendLink(linkPhone, linkUrl, linkCaption || undefined);
+      addLog({ type: 'response', method: 'POST', url: '/send/link', data: response.data, status: 200 });
+      toast({ title: 'Link sent!' });
+      setLinkPhone('');
+      setLinkUrl('');
+      setLinkCaption('');
+    } catch (error: unknown) {
+      addLog({ type: 'error', method: 'POST', url: '/send/link', data: getErrorData(error) });
+      toast({ title: 'Failed to send', variant: 'destructive' });
+    }
+    setLoading(false);
+  };
+
+  const handleSendPresence = async () => {
+    setLoading(true);
+    try {
+      const response = presenceType === 'presence'
+        ? await sendPresence(presencePhone, presenceValue)
+        : await sendChatPresence(presencePhone, presenceValue);
+      addLog({ type: 'response', method: 'POST', url: presenceType === 'presence' ? '/send/presence' : '/send/chat-presence', data: response.data, status: 200 });
+      toast({ title: 'Presence sent!' });
+      setPresencePhone('');
+    } catch (error: unknown) {
+      addLog({ type: 'error', method: 'POST', url: presenceType === 'presence' ? '/send/presence' : '/send/chat-presence', data: getErrorData(error) });
       toast({ title: 'Failed to send', variant: 'destructive' });
     }
     setLoading(false);
@@ -180,7 +234,7 @@ export default function SendCenterPage() {
       <Card>
         <CardContent className="pt-6">
           <Tabs defaultValue="text">
-            <TabsList className="grid grid-cols-3 md:grid-cols-6 w-full">
+            <TabsList className="grid grid-cols-3 md:grid-cols-8 w-full">
               <TabsTrigger value="text" className="gap-2">
                 <Send className="w-4 h-4" />
                 <span className="hidden md:inline">Text</span>
@@ -204,6 +258,14 @@ export default function SendCenterPage() {
               <TabsTrigger value="sticker" className="gap-2">
                 <Sticker className="w-4 h-4" />
                 <span className="hidden md:inline">Sticker</span>
+              </TabsTrigger>
+              <TabsTrigger value="link" className="gap-2">
+                <Link2 className="w-4 h-4" />
+                <span className="hidden md:inline">Link</span>
+              </TabsTrigger>
+              <TabsTrigger value="presence" className="gap-2">
+                <Activity className="w-4 h-4" />
+                <span className="hidden md:inline">Presence</span>
               </TabsTrigger>
             </TabsList>
 
@@ -249,7 +311,7 @@ export default function SendCenterPage() {
                 <div>
                   <Label>Media Type</Label>
                   <div className="flex gap-2 mt-1">
-                    {(['image', 'video', 'audio', 'document'] as const).map((type) => (
+                    {(['image', 'video', 'audio', 'file'] as const).map((type) => (
                       <Button
                         key={type}
                         variant={mediaType === type ? 'default' : 'outline'}
@@ -259,7 +321,7 @@ export default function SendCenterPage() {
                         {type === 'image' && <Image className="w-4 h-4" />}
                         {type === 'video' && <Video className="w-4 h-4" />}
                         {type === 'audio' && <FileText className="w-4 h-4" />}
-                        {type === 'document' && <FileText className="w-4 h-4" />}
+                        {type === 'file' && <FileText className="w-4 h-4" />}
                       </Button>
                     ))}
                   </div>
@@ -458,6 +520,90 @@ export default function SendCenterPage() {
               <Button onClick={handleSendSticker} disabled={loading || !stickerPhone || !stickerFile}>
                 {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
                 Send Sticker
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="link" className="space-y-4 mt-6">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="link-phone">Phone Number</Label>
+                  <Input
+                    id="link-phone"
+                    value={linkPhone}
+                    onChange={(e) => setLinkPhone(e.target.value)}
+                    placeholder="e.g., 6281234567890"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="link-url">URL</Label>
+                  <Input
+                    id="link-url"
+                    value={linkUrl}
+                    onChange={(e) => setLinkUrl(e.target.value)}
+                    placeholder="https://example.com"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="link-caption">Caption (optional)</Label>
+                <Input
+                  id="link-caption"
+                  value={linkCaption}
+                  onChange={(e) => setLinkCaption(e.target.value)}
+                  placeholder="Add a caption..."
+                />
+              </div>
+              <Button onClick={handleSendLink} disabled={loading || !linkPhone || !linkUrl}>
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                Send Link
+              </Button>
+            </TabsContent>
+
+            <TabsContent value="presence" className="space-y-4 mt-6">
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="presence-phone">Phone Number</Label>
+                  <Input
+                    id="presence-phone"
+                    value={presencePhone}
+                    onChange={(e) => setPresencePhone(e.target.value)}
+                    placeholder="e.g., 6281234567890"
+                  />
+                </div>
+                <div>
+                  <Label>Type</Label>
+                  <div className="flex gap-2 mt-1">
+                    {(['presence', 'chat'] as const).map((t) => (
+                      <Button
+                        key={t}
+                        variant={presenceType === t ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setPresenceType(t)}
+                      >
+                        {t}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="presence-value">Value</Label>
+                  <select
+                    id="presence-value"
+                    className="w-full border rounded-md px-3 py-2"
+                    value={presenceValue}
+                    onChange={(e) => setPresenceValue(e.target.value)}
+                  >
+                    <option value="available">available</option>
+                    <option value="unavailable">unavailable</option>
+                    <option value="composing">composing</option>
+                    <option value="paused">paused</option>
+                    <option value="recording">recording</option>
+                  </select>
+                </div>
+              </div>
+              <Button onClick={handleSendPresence} disabled={loading || !presencePhone || !presenceValue}>
+                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                Send Presence
               </Button>
             </TabsContent>
           </Tabs>

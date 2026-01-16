@@ -31,6 +31,13 @@ interface SendResult {
   error?: string;
 }
 
+const generateId = () =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+
 const defaultTemplates: Template[] = [
   {
     id: '1',
@@ -121,7 +128,7 @@ export default function BulkMessagingPage() {
   const saveTemplate = () => {
     if (!newTemplateName || !newTemplateContent) return;
     const newTemplate: Template = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name: newTemplateName,
       content: newTemplateContent
     };
@@ -181,17 +188,31 @@ export default function BulkMessagingPage() {
           status: 200
         });
         newResults.push({ phone: contact.phone, status: 'success' });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const err = (typeof error === 'object' && error !== null ? error : {}) as Record<string, unknown>;
+        const response = err.response;
+        const responseData =
+          typeof response === 'object' && response !== null && 'data' in response
+            ? (response as Record<string, unknown>).data
+            : undefined;
+        const message = typeof err.message === 'string' ? err.message : 'Unknown error';
+
         addLog({
           type: 'error',
           method: 'POST',
           url: '/send/message',
-          data: error.response?.data || error.message
+          data: responseData ?? message
         });
         newResults.push({ 
           phone: contact.phone, 
           status: 'failed',
-          error: error.response?.data?.message || error.message || 'Unknown error'
+          error:
+            typeof responseData === 'object' &&
+            responseData !== null &&
+            'message' in responseData &&
+            typeof (responseData as Record<string, unknown>).message === 'string'
+              ? (responseData as Record<string, unknown>).message as string
+              : message
         });
       }
 

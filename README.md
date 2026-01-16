@@ -1,73 +1,122 @@
-# Welcome to your Lovable project
+# GOWA Dashboard
 
-## Project info
+Dashboard ini adalah UI untuk mengelola GOWA (Go WhatsApp API) berbasis REST, dibangun dengan:
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+- Vite
+- React + TypeScript
+- Tailwind CSS
+- shadcn-ui
 
-## How can I edit this code?
+Dokumen ini menjelaskan cara instalasi, konfigurasi environment, dan cara menjalankan project dengan benar.
 
-There are several ways of editing your application.
+## 1. Prasyarat
 
-**Use Lovable**
+- Node.js dan npm terpasang di komputer
+- Akses ke server GOWA (REST mode) yang sudah berjalan
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## 2. Instalasi
 
-Changes made via Lovable will be committed automatically to this repo.
+Jalankan di root project:
 
-**Use your preferred IDE**
+```bash
+npm install
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Jika ada peringatan vulnerability, Anda bisa cek dengan:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+npm audit
+```
 
-Follow these steps:
+## 3. Script npm yang tersedia
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+Script utama yang bisa digunakan:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- `npm run dev` – Menjalankan development server
+- `npm run build` – Build untuk production
+- `npm run preview` – Preview hasil build
+- `npm run lint` – Menjalankan eslint
+- `npm test` – Menjalankan test (vitest)
 
-# Step 3: Install the necessary dependencies.
-npm i
+Catatan penting:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+- Tidak ada script `server`
+- Tidak ada script `start`
+
+Jadi, perintah seperti:
+
+- `npm run server`
+- `npm start`
+
+akan error dengan pesan “Missing script” karena memang tidak didefinisikan di `package.json`.
+
+Untuk pengembangan, gunakan:
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Setelah itu buka URL yang tampil di terminal, biasanya:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```text
+http://localhost:8080/
+```
 
-**Use GitHub Codespaces**
+## 4. Konfigurasi Environment (.env)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Dashboard ini menggunakan environment variable pendek dan bersih, langsung diakses di sisi client.
 
-## What technologies are used for this project?
+Buat file `.env` di root project dan isi minimal seperti berikut:
 
-This project is built with:
+```bash
+API_URL=http://192.168.18.50:3003
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Penjelasan:
 
-## How can I deploy this project?
+– `API_URL`  
+  Base URL server GOWA (contoh: `http://192.168.18.50:3003`)
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## 5. Integrasi ke GOWA API
 
-## Can I connect a custom domain to my Lovable project?
+Semua request HTTP menggunakan instance axios global yang:
 
-Yes, you can!
+- Menggunakan `API_URL` sebagai `baseURL`
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Beberapa endpoint utama yang digunakan:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `GET /devices` – daftar device, auto-select device pertama jika ada
+- `GET /chats` – menampilkan daftar chat
+- `POST /send/message` – kirim pesan teks sederhana
+- `POST /group` – membuat grup baru
+
+Detail lengkap struktur payload mengikuti spesifikasi resmi GOWA openapi.
+
+## 7. Build untuk Production
+
+Untuk build dan preview:
+
+```bash
+npm run build
+npm run preview
+```
+
+Server preview akan berjalan di port default Vite preview, dan dapat diakses lewat URL yang ditampilkan di terminal.
+
+## 8. Ringkasan Error Umum
+
+Jika Anda melihat error seperti:
+
+```text
+npm run server
+npm error Missing script: "server"
+```
+
+atau
+
+```text
+npm start
+npm error Missing script: "start"
+```
+
+itu normal karena script tersebut memang tidak ada. Gunakan `npm run dev` untuk development, atau `npm run build` dan `npm run preview` untuk mode production/preview.

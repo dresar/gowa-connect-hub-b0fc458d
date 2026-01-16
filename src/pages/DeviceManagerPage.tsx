@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, QrCode, Key, RefreshCw, Smartphone, Loader2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Trash2, QrCode, Key, RefreshCw, Smartphone, Loader2, LogOut } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,13 +13,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  getDevices, 
-  createDevice, 
-  deleteDevice, 
-  getDeviceQR, 
-  loginWithCode, 
-  reconnectDevice 
+import {
+  getDevices,
+  getDeviceStatus,
+  createDevice,
+  deleteDevice,
+  appLogin,
+  appLoginWithCode,
+  reconnectDevice,
+  logoutDevice,
 } from '@/lib/api';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { PageLoader } from '@/components/common/LoadingSpinner';
@@ -31,8 +33,17 @@ interface Device {
   status?: string;
 }
 
+type RawDevice = {
+  id?: unknown;
+  name?: unknown;
+  status?: unknown;
+  state?: unknown;
+  connection_state?: unknown;
+  connectionStatus?: unknown;
+};
+
 export default function DeviceManagerPage() {
-  const { refreshDevices, setSelectedDevice } = useAuth();
+  const { refreshDevices, setDeviceName, setSelectedDevice } = useAuth();
   const { toast } = useToast();
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,22 +59,117 @@ export default function DeviceManagerPage() {
   const [newDeviceId, setNewDeviceId] = useState('');
   const [qrCode, setQrCode] = useState('');
   const [pairingPhone, setPairingPhone] = useState('');
+  const [pairingCode, setPairingCode] = useState('');
   const [selectedDeviceId, setSelectedDeviceId] = useState('');
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+  const [renameDeviceId, setRenameDeviceId] = useState('');
+  const [renameName, setRenameName] = useState('');
 
-  const fetchDevices = async () => {
+  const normalizeStatus = (status?: string): string | undefined => {
+    if (!status) return undefined;
+    const value = status.toLowerCase();
+    if (value === 'available') return 'active';
+    if (value === 'active') return 'active';
+    if (value === 'open') return 'connected';
+    if (value === 'initializing') return 'connecting';
+    if (value === 'timeout') return 'error';
+    if (value === 'closing') return 'disconnected';
+    return status;
+  };
+
+  const fetchDevices = useCallback(async () => {
     setLoading(true);
     try {
       const response = await getDevices();
-      setDevices(response.data.devices || response.data || []);
+      const storedNamesRaw = localStorage.getItem('gowa_device_names');
+      let storedNames: Record<string, string> = {};
+      if (storedNamesRaw) {
+        try {
+          const parsed = JSON.parse(storedNamesRaw);
+          if (typeof parsed === 'object' && parsed !== null) {
+            storedNames = parsed as Record<string, string>;
+          }
+        } catch {
+          storedNames = {};
+        }
+      }
+      const data = response.data || {};
+      const deviceList =
+        data.results ||
+        data.devices ||
+        data.data ||
+        data ||
+        [];
+      const list = Array.isArray(deviceList)
+        ? deviceList.map((raw: RawDevice) => {
+            const id = typeof raw.id === 'string' ? raw.id : '';
+            if (!id) return null;
+            const name = storedNames[id] || (typeof raw.name === 'string' ? raw.name : undefined);
+            const rawStatus: string | undefined =
+              typeof raw.status === 'string'
+                ? raw.status
+                : typeof raw.state === 'string'
+                ? raw.state
+                : typeof raw.connection_state === 'string'
+                ? raw.connection_state
+                : typeof raw.connectionStatus === 'string'
+                ? raw.connectionStatus
+                : undefined;
+            const status = normalizeStatus(rawStatus);
+            return { id, name, status } as Device;
+          }).filter((device): device is Device => Boolean(device))
+        : [];
+      setDevices(list);
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to fetch devices', variant: 'destructive' });
     }
     setLoading(false);
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchDevices();
-  }, []);
+  }, [fetchDevices]);
+
+  useEffect(() => {
+    const shouldTrack =
+      selectedDeviceId &&
+      ((qrModalOpen && Boolean(qrCode)) || (pairingModalOpen && Boolean(pairingCode)));
+
+    if (!shouldTrack) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await getDeviceStatus(selectedDeviceId);
+        const data = response.data || {};
+        const results =
+          typeof data.results === 'object' && data.results !== null ? data.results : {};
+        const isLoggedIn =
+          typeof (results as { is_logged_in?: boolean }).is_logged_in === 'boolean'
+            ? (results as { is_logged_in?: boolean }).is_logged_in
+            : false;
+
+        if (isLoggedIn) {
+          clearInterval(interval);
+          setQrModalOpen(false);
+          setQrCode('');
+          setPairingModalOpen(false);
+          setPairingCode('');
+          setPairingPhone('');
+          toast({
+            title: 'Device connected',
+            description: 'WhatsApp device is now connected.',
+          });
+          await fetchDevices();
+        }
+      } catch {
+        return;
+      }
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [qrModalOpen, pairingModalOpen, qrCode, pairingCode, selectedDeviceId, fetchDevices, toast]);
 
   const handleAddDevice = async () => {
     setActionLoading('add');
@@ -82,10 +188,18 @@ export default function DeviceManagerPage() {
 
   const handleGetQR = async (deviceId: string) => {
     setSelectedDeviceId(deviceId);
+    setSelectedDevice(deviceId);
     setActionLoading(deviceId);
     try {
-      const response = await getDeviceQR(deviceId);
-      setQrCode(response.data.qr || response.data.qrCode || '');
+      const response = await appLogin();
+      const data = response.data || {};
+      const results = typeof data.results === 'object' && data.results !== null ? data.results : {};
+      const qr =
+        (results as { qr_link?: string }).qr_link ||
+        (data as { qr?: string }).qr ||
+        (data as { qrCode?: string }).qrCode ||
+        '';
+      setQrCode(qr);
       setQrModalOpen(true);
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to get QR code', variant: 'destructive' });
@@ -96,10 +210,22 @@ export default function DeviceManagerPage() {
   const handlePairingCode = async () => {
     setActionLoading('pairing');
     try {
-      await loginWithCode(selectedDeviceId, pairingPhone);
-      toast({ title: 'Success', description: 'Pairing code sent to your phone' });
-      setPairingModalOpen(false);
-      setPairingPhone('');
+      if (selectedDeviceId) {
+        setSelectedDevice(selectedDeviceId);
+      }
+      const response = await appLoginWithCode(pairingPhone);
+      const data = response.data || {};
+      const results = typeof data.results === 'object' && data.results !== null ? data.results : {};
+      const code =
+        (results as { pair_code?: string }).pair_code ||
+        (data as { pair_code?: string }).pair_code ||
+        '';
+      setPairingCode(code);
+      if (!code) {
+        toast({ title: 'Error', description: 'No pairing code received', variant: 'destructive' });
+      } else {
+        toast({ title: 'Success', description: 'Pairing code generated. Enter it on your device.' });
+      }
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to send pairing code', variant: 'destructive' });
     }
@@ -132,6 +258,44 @@ export default function DeviceManagerPage() {
     setActionLoading(null);
   };
 
+  const handleLogout = async (deviceId: string) => {
+    setActionLoading(deviceId);
+    try {
+      await logoutDevice(deviceId);
+      toast({ title: 'Success', description: 'Device logged out successfully' });
+      await fetchDevices();
+      await refreshDevices();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to logout device', variant: 'destructive' });
+    }
+    setActionLoading(null);
+  };
+
+  const handleOpenRename = (device: Device) => {
+    setRenameDeviceId(device.id);
+    setRenameName(device.name || '');
+    setRenameModalOpen(true);
+  };
+
+  const handleSaveRename = () => {
+    const value = renameName.trim();
+    if (!value) {
+      toast({
+        title: 'Invalid name',
+        description: 'Device name cannot be empty',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setDeviceName(renameDeviceId, value);
+    setDevices((prev) =>
+      prev.map((device) =>
+        device.id === renameDeviceId ? { ...device, name: value } : device
+      )
+    );
+    setRenameModalOpen(false);
+  };
+
   if (loading) return <PageLoader />;
 
   return (
@@ -148,7 +312,7 @@ export default function DeviceManagerPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {devices.length === 0 ? (
+        {!Array.isArray(devices) || devices.length === 0 ? (
           <Card className="col-span-full">
             <CardContent className="py-12 text-center">
               <Smartphone className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -208,12 +372,25 @@ export default function DeviceManagerPage() {
                     <RefreshCw className="w-4 h-4 mr-1" />
                     Reconnect
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="outline"
-                    onClick={() => setSelectedDevice(device.id)}
+                    onClick={() => handleOpenRename(device)}
                   >
-                    Select
+                    Rename
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleLogout(device.id)}
+                    disabled={actionLoading === device.id}
+                  >
+                    {actionLoading === device.id ? (
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    ) : (
+                      <LogOut className="w-4 h-4 mr-1" />
+                    )}
+                    Logout
                   </Button>
                   <Button 
                     size="sm" 
@@ -265,7 +442,10 @@ export default function DeviceManagerPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Scan QR Code</DialogTitle>
-            <DialogDescription>Scan this QR code with your WhatsApp app</DialogDescription>
+            <DialogDescription>
+              Scan this QR code with your WhatsApp app. This dialog will close automatically when
+              the device is connected.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex justify-center p-4">
             {qrCode ? (
@@ -301,13 +481,42 @@ export default function DeviceManagerPage() {
                 onChange={(e) => setPairingPhone(e.target.value)}
                 placeholder="e.g., 6281234567890"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Use your full phone number with country code.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                1. Open WhatsApp on your phone, 2. Tap Linked devices, 3. Choose Link with pairing code, 4. Enter the code below.
+              </p>
+              {pairingCode && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-center text-muted-foreground">
+                    Enter this code on your WhatsApp device
+                  </p>
+                  <div className="flex justify-center">
+                    <div className="px-4 py-2 rounded-xl border border-border bg-card text-2xl font-semibold font-mono tracking-[0.35em]">
+                      {pairingCode}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPairingModalOpen(false)}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPairingModalOpen(false);
+                setPairingPhone('');
+                setPairingCode('');
+              }}
+            >
+              Cancel
+            </Button>
             <Button onClick={handlePairingCode} disabled={actionLoading === 'pairing'}>
               {actionLoading === 'pairing' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Send Code
+              Get Pairing Code
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -327,6 +536,34 @@ export default function DeviceManagerPage() {
             <Button variant="destructive" onClick={handleDeleteDevice} disabled={actionLoading === 'delete'}>
               {actionLoading === 'delete' && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={renameModalOpen} onOpenChange={setRenameModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Device</DialogTitle>
+            <DialogDescription>Set a custom name for this device</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="deviceName">Device Name</Label>
+              <Input
+                id="deviceName"
+                value={renameName}
+                onChange={(e) => setRenameName(e.target.value)}
+                placeholder="Enter device name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveRename}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

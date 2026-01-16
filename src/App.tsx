@@ -17,6 +17,7 @@ import UserContactPage from "@/pages/UserContactPage";
 import NewsletterPage from "@/pages/NewsletterPage";
 import WebhookLogsPage from "@/pages/WebhookLogsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import AutoReplyPage from "@/pages/AutoReplyPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,7 +29,12 @@ const App = () => (
         <LogProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route element={<MainLayout />}>
@@ -36,6 +42,7 @@ const App = () => (
                 <Route path="/devices" element={<DeviceManagerPage />} />
                 <Route path="/chats" element={<ChatExplorerPage />} />
                 <Route path="/send" element={<SendCenterPage />} />
+                <Route path="/auto-reply" element={<AutoReplyPage />} />
                 <Route path="/bulk" element={<BulkMessagingPage />} />
                 <Route path="/groups" element={<GroupManagementPage />} />
                 <Route path="/user" element={<UserContactPage />} />

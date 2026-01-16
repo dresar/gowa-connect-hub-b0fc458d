@@ -10,10 +10,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
+const API_URL = import.meta.env.API_URL || 'http://192.168.18.50:3003';
+
 export default function LoginPage() {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin');
-  const [baseUrl, setBaseUrl] = useState(() => localStorage.getItem('gowa_base_url') || 'https://gowa.ekacode.web.id');
+  const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -29,40 +29,44 @@ export default function LoginPage() {
       setCheckingServer(false);
     };
     checkServer();
-  }, [baseUrl]);
+  }, [checkServerStatus]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    const trimmedUsername = username.trim() || 'guest';
+
     setLoading(true);
 
-    // Save base URL before login attempt
-    localStorage.setItem('gowa_base_url', baseUrl);
+    try {
+      const result = await login(trimmedUsername);
 
-    const result = await login(username, password);
-    
-    if (result.success) {
+      if (result.success) {
+        localStorage.setItem('dashboard_username', trimmedUsername);
+        toast({
+          title: 'Welcome',
+          description: 'Kamu sudah masuk ke dashboard.',
+        });
+        navigate('/');
+      } else {
+        setError(result.error || 'Login failed');
+        toast({
+          title: 'Login Failed',
+          description: result.error || 'Tidak bisa masuk ke dashboard.',
+          variant: 'destructive',
+        });
+      }
+    } catch {
+      setError('Terjadi kesalahan saat memproses login.');
       toast({
-        title: 'Login Successful',
-        description: 'Please select a device to continue.',
-      });
-      navigate('/');
-    } else {
-      setError(result.error || 'Login failed');
-      toast({
-        title: 'Login Failed',
-        description: result.error || 'Invalid credentials or server unreachable.',
+        title: 'Login Error',
+        description: 'Terjadi masalah tak terduga. Silakan coba lagi.',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
-  };
-
-  const handleBaseUrlChange = (url: string) => {
-    setBaseUrl(url);
-    localStorage.setItem('gowa_base_url', url);
-    setError(null);
   };
 
   return (
@@ -126,23 +130,11 @@ export default function LoginPage() {
                 required
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                required
-              />
-            </div>
-
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" type="button" className="w-full text-muted-foreground text-sm">
                   <Settings className="w-4 h-4 mr-2" />
-                  {showAdvanced ? 'Hide' : 'Show'} Advanced Settings
+                  {showAdvanced ? 'Hide' : 'Show'} Connection Info
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-2 pt-2">
@@ -150,12 +142,12 @@ export default function LoginPage() {
                 <Input
                   id="baseUrl"
                   type="url"
-                  value={baseUrl}
-                  onChange={(e) => handleBaseUrlChange(e.target.value)}
-                  placeholder="https://gowa.ekacode.web.id"
+                  value={API_URL}
+                  readOnly
+                  disabled
                 />
                 <p className="text-xs text-muted-foreground">
-                  Change this if your GOWA server is hosted elsewhere
+                  This URL comes from your API_URL environment variable.
                 </p>
               </CollapsibleContent>
             </Collapsible>
@@ -167,14 +159,10 @@ export default function LoginPage() {
                   Connecting...
                 </>
               ) : (
-                'Login'
+                'Enter Dashboard'
               )}
             </Button>
           </form>
-
-          <p className="text-xs text-center text-muted-foreground mt-4">
-            Default credentials: admin / admin
-          </p>
         </CardContent>
       </Card>
     </div>

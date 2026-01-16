@@ -24,18 +24,83 @@ export default function NewsletterPage() {
   useEffect(() => {
     fetchNewsletters();
   }, []);
-
   const fetchNewsletters = async () => {
     setLoading(true);
     try {
       const response = await getMyNewsletters();
-      setNewsletters(response.data.newsletters || response.data || []);
+      const raw = (response.data?.results?.data ?? []) as unknown[];
+
+      const formatted: Newsletter[] = Array.isArray(raw)
+        ? raw.map((item) => {
+            const n = item as {
+              id?: string;
+              thread_metadata?: {
+                name?: { text?: string };
+                description?: { text?: string } | string;
+                subscribers_count?: number | string;
+              };
+              subscribers_count?: number | string;
+              picture?: string;
+              preview?: { url?: string };
+            };
+
+            const id = n.id;
+            const name =
+              n.thread_metadata?.name?.text ||
+              (typeof id === 'string' && id.includes('@') ? id.split('@')[0] : id) ||
+              'Unknown';
+
+            const description =
+              n.thread_metadata?.description?.text ||
+              n.thread_metadata?.description ||
+              '';
+
+            const subscribersValue = n.subscribers_count ?? n.thread_metadata?.subscribers_count;
+            const subscribers =
+              typeof subscribersValue === 'string'
+                ? Number(subscribersValue)
+                : typeof subscribersValue === 'number'
+                ? subscribersValue
+                : undefined;
+
+            const picture: string | undefined =
+              typeof n.picture === 'string'
+                ? n.picture
+                : typeof n.preview?.url === 'string' && n.preview.url
+                ? n.preview.url
+                : undefined;
+
+            return {
+              jid: id || '',
+              name,
+              description,
+              subscribers,
+              picture,
+            };
+          })
+        : [];
+
+      setNewsletters(formatted);
     } catch (error) {
-      // Mock data for demo
       setNewsletters([
-        { jid: '120363123456789@newsletter', name: 'Tech News Daily', description: 'Latest technology updates', subscribers: 15420 },
-        { jid: '120363987654321@newsletter', name: 'Business Insights', description: 'Market trends and analysis', subscribers: 8750 },
-        { jid: '120363111222333@newsletter', name: 'Developer Weekly', description: 'Coding tips and tutorials', subscribers: 23100 },
+        {
+          jid: '120363123456789@newsletter',
+          name: 'Tech News Daily',
+          description: 'Latest technology updates',
+          subscribers: 15420,
+        },
+        {
+          jid: '120363987654321@newsletter',
+          name: 'Business Insights',
+          description: 'Market trends and analysis',
+          subscribers: 8750,
+        },
+        {
+          jid: '120363111222333@newsletter',
+          name: 'Developer Weekly',
+          description: 'Coding tips and tutorials',
+          subscribers: 23100,
+        },
       ]);
     }
     setLoading(false);

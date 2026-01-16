@@ -1,0 +1,13 @@
+{
+  "dbPath": "c:\\Users\\eka\\Downloads\\BOT WA\\gowa-connect-hub-b0fc458d\\db",
+  "collections": [
+    "auto_reply_rules"
+  ],
+  "connection": {
+    "type": "file",
+    "encoding": "utf-8",
+    "autoBackup": true,
+    "backupDir": "c:\\Users\\eka\\Downloads\\BOT WA\\gowa-connect-hub-b0fc458d\\db\\backup"
+  }
+}
+

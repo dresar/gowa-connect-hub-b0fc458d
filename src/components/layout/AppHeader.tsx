@@ -1,4 +1,4 @@
-import { LogOut, Smartphone, Menu, Sun, Moon, Monitor, Bell, BellOff } from 'lucide-react';
+import { Smartphone, Menu, Sun, Moon, Monitor, Bell, BellOff, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -17,12 +17,20 @@ import { useAuth } from '@/contexts/AuthContext';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useTheme } from '@/hooks/use-theme';
 import { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 export function AppHeader() {
-  const { devices, selectedDevice, setSelectedDevice, logout } = useAuth();
+  const { devices, selectedDevice, setSelectedDevice } = useAuth();
   const { theme, setTheme } = useTheme();
-  const username = localStorage.getItem('gowa_username') || 'admin';
+  const username = localStorage.getItem('dashboard_username') || 'admin';
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -87,6 +95,10 @@ export function AppHeader() {
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="Settings">
+          <Settings className="w-4 h-4" />
+        </Button>
+
         <div className="flex items-center gap-2">
           <Smartphone className="w-4 h-4 text-muted-foreground" />
           <Select value={selectedDevice} onValueChange={setSelectedDevice}>
@@ -109,13 +121,27 @@ export function AppHeader() {
 
         <div className="flex items-center gap-3 pl-4 border-l border-border">
           <span className="text-sm text-muted-foreground">
-            Logged in as <span className="font-medium text-foreground">{username}</span>
+            User <span className="font-medium text-foreground">{username}</span>
           </span>
-          <Button variant="ghost" size="icon" onClick={logout} title="Logout">
-            <LogOut className="w-4 h-4" />
-          </Button>
         </div>
       </div>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>Current API configuration</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between gap-4">
+              <span className="text-muted-foreground">API URL</span>
+              <span className="font-mono text-right break-all">
+                {import.meta.env.API_URL || 'http://192.168.18.50:3003'}
+              </span>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }
